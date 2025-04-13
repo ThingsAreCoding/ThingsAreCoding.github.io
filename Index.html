@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Picarto Multistream Viewer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #121212;
+      color: #fff;
+    }
+
+    header {
+      background: #1f1f1f;
+      padding: 1em;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.2em;
+    }
+
+    input, select, button {
+      padding: 0.5em;
+      font-size: 1em;
+    }
+
+    #streams {
+      display: grid;
+      gap: 0.3em;
+      padding: 0.3em;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .panel {
+      background: #1e1e1e;
+      border-radius: 0.25em;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .video-wrapper {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background: #000;
+    }
+
+    video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .label {
+      padding: 0.5em;
+      font-size: 0.9em;
+      background: #2a2a2a;
+      text-align: center;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: flex-start;
+      gap: 0.3em;
+      padding: 0.3em;
+    }
+
+    .chat-btn, .reload-btn, .remove-btn {
+      background: #3a3a3a;
+      border: none;
+      color: white;
+      padding: 0.3em 0.4em;
+      cursor: pointer;
+      border-radius: 0.3em;
+    }
+
+    .chat-btn:hover, .reload-btn:hover {
+      background: #4fc3f7;
+    }
+
+    .remove-btn:hover {
+      background: #ff4d4d;
+    }
+
+    @media screen and (min-width: 600px) {
+      #streams.grid-1 {
+        grid-template-columns: 1fr;
+        grid-auto-rows: calc(100vh - 150px);
+      }
+
+      #streams.grid-2 {
+        grid-template-columns: 1fr 1fr;
+        grid-auto-rows: calc((100vh - 150px) / 1);
+      }
+
+      #streams.grid-3 {
+        grid-template-columns: 1fr 1fr;
+        grid-auto-rows: calc((100vh - 150px) / 2);
+      }
+
+      #streams.grid-4 {
+        grid-template-columns: 1fr 1fr;
+        grid-auto-rows: calc((100vh - 150px) / 2);
+      }
+
+      #streams.grid-5,
+      #streams.grid-6 {
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-auto-rows: calc((100vh - 150px) / 2);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <label for="artistName">Artist:</label>
+    <input type="text" id="artistName" placeholder="CaseSensitiveName" />
+
+    <label for="serverSelect">Server:</label>
+    <select id="serverSelect">
+      <option value="us-losangeles">US - Los Angeles</option>
+      <option value="us-miami" selected>US - Miami</option>
+      <option value="us-newyork">US - New York</option>
+      <option value="us-dallas">US - Dallas</option>
+	  <option value="eu-west">EU - West</option>
+	  
+    </select>
+
+    <button onclick="addStream()">Add Stream</button>
+    	
+  </header>
+
+  <div id="streams"></div>
+
+  <script>
+    const activeStreams = [];
+
+    function addStream() {
+      const artistInput = document.getElementById('artistName');
+      const serverSelect = document.getElementById('serverSelect');
+
+      const artist = artistInput.value.trim();
+      const server = serverSelect.value;
+
+      if (!artist) return;
+
+      const streamId = `${artist}-${server}`;
+      if (document.getElementById(`stream-${streamId}`)) return; // prevent duplicates
+
+      const videoURL = `https://edge1-${server}.picarto.tv/stream/golive%2b${artist}.mp4`;
+      const chatURL = `https://picarto.tv/chatpopout/${artist}/public`;
+
+      const panel = document.createElement('div');
+      panel.className = 'panel';
+      panel.id = `stream-${streamId}`;
+
+      panel.innerHTML = `
+        <div class="label">${artist} &mdash; ${server}</div>
+        <div class="video-wrapper">
+          <video id="video-${streamId}" controls autoplay muted>
+            <source src="${videoURL}" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
+        </div>
+        <div class="controls">
+          <button class="chat-btn" onclick="window.open('${chatURL}', '_blank', 'toolbar=0,location=0,menubar=0 height=1000,width=500' )">Popout Chat</button>
+          <button class="reload-btn" onclick="reloadStream('${streamId}')">Reload</button>
+          <button class="remove-btn" onclick="removeStream('${streamId}')">Close Stream</button>
+        </div>
+      `;
+
+      document.getElementById('streams').appendChild(panel);
+      activeStreams.push({ artist, server, chatURL });
+      artistInput.value = '';
+
+      adjustLayout();
+    }
+
+    function removeStream(streamId) {
+      const panel = document.getElementById(`stream-${streamId}`);
+      if (panel) {
+        panel.remove();
+        const index = activeStreams.findIndex(s => `${s.artist}-${s.server}` === streamId);
+        if (index > -1) activeStreams.splice(index, 1);
+      }
+
+      adjustLayout();
+    }
+
+    function reloadStream(streamId) {
+      const video = document.getElementById(`video-${streamId}`);
+      if (video) {
+        video.pause();
+        video.load();
+        video.play();
+      }
+    }
+
+    function adjustLayout() {
+	  const streamsContainer = document.getElementById('streams');
+	  const allPanels = document.querySelectorAll('.panel');
+	  const count = allPanels.length;
+
+	  // Calculate available height
+	  const headerHeight = document.querySelector('header').offsetHeight;
+	  const controlHeight = 5; // Approximate height of control buttons
+	  const availableHeight = window.innerHeight - headerHeight - controlHeight - 3; // Additional padding
+
+	  // Set the height of the streams container
+	  streamsContainer.style.height = `${availableHeight}px`;
+
+	  if (count === 0) {
+		streamsContainer.style.gridTemplateColumns = '';
+		return;
+	  }
+
+	  let columns;
+	  if (count === 1) {
+		columns = 1;
+	  } else if (count === 2) {
+		columns = 2;
+	  } else if (count === 3) {
+		columns = 2;
+	  } else if (count === 4) {
+		columns = 2;
+	  } else {
+		columns = Math.ceil(Math.sqrt(count));
+	  }
+
+	  streamsContainer.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+	}
+
+
+    window.addEventListener('resize', adjustLayout);
+  </script>
+</body>
+</html>
